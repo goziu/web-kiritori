@@ -25,7 +25,7 @@
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 
                  'Yu Gothic', Meiryo, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #fafafa;
     min-height: 100vh;
     padding: 20px;
     color: var(--text-color);
@@ -321,7 +321,7 @@ main {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    pointer-events: none;
+    pointer-events: auto;
     z-index: 10;
 }
 
@@ -329,7 +329,8 @@ main {
     position: relative;
     border: 3px solid var(--primary-color);
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
-    pointer-events: none;
+    pointer-events: auto;
+    cursor: move;
 }
 
 .crop-box::before,
@@ -337,6 +338,7 @@ main {
     content: '';
     position: absolute;
     background: var(--primary-color);
+    pointer-events: none;
 }
 
 .crop-box::before {
@@ -353,6 +355,99 @@ main {
     bottom: 0;
     width: 1px;
     transform: translateX(-50%);
+}
+
+/* リサイズハンドル */
+.resize-handle {
+    position: absolute;
+    background: white;
+    border: 2px solid var(--primary-color);
+    z-index: 20;
+    pointer-events: auto;
+}
+
+/* 四隅のハンドル */
+.handle-nw, .handle-ne, .handle-sw, .handle-se {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.handle-nw {
+    top: -6px;
+    left: -6px;
+    cursor: nw-resize;
+}
+
+.handle-ne {
+    top: -6px;
+    right: -6px;
+    cursor: ne-resize;
+}
+
+.handle-sw {
+    bottom: -6px;
+    left: -6px;
+    cursor: sw-resize;
+}
+
+.handle-se {
+    bottom: -6px;
+    right: -6px;
+    cursor: se-resize;
+}
+
+/* 辺のハンドル */
+.handle-n, .handle-s, .handle-w, .handle-e {
+    background: var(--primary-color);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.crop-box:hover .handle-n,
+.crop-box:hover .handle-s,
+.crop-box:hover .handle-w,
+.crop-box:hover .handle-e {
+    opacity: 0.5;
+}
+
+.handle-n, .handle-s {
+    width: 40px;
+    height: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.handle-n {
+    top: -3px;
+    cursor: n-resize;
+}
+
+.handle-s {
+    bottom: -3px;
+    cursor: s-resize;
+}
+
+.handle-w, .handle-e {
+    width: 6px;
+    height: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.handle-w {
+    left: -3px;
+    cursor: w-resize;
+}
+
+.handle-e {
+    right: -3px;
+    cursor: e-resize;
+}
+
+.resize-handle:hover {
+    background: var(--primary-color);
+    opacity: 1 !important;
 }
 
 /* アクションボタン */

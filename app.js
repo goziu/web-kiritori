@@ -32,6 +32,16 @@ class ImageCropper {
         this.dragStart = { x: 0, y: 0 };
         this.currentAspectRatio = 'free';
         this.cropSize = { width: 300, height: 300 };
+        this.cropPosition = { x: 0, y: 0 }; // クロップボックスの位置（中央からの相対位置）
+        
+        // リサイズ状態管理
+        this.isResizing = false;
+        this.resizeDirection = null;
+        this.resizeStart = { x: 0, y: 0, width: 0, height: 0 };
+        
+        // クロップボックス移動状態管理
+        this.isMovingCropBox = false;
+        this.cropBoxDragStart = { x: 0, y: 0 };
         
         this.init();
     }
@@ -85,6 +95,50 @@ class ImageCropper {
         this.resetBtn.addEventListener('click', () => this.resetImage());
         this.cropBtn.addEventListener('click', () => this.cropImage());
         this.downloadBtn.addEventListener('click', () => this.downloadImage());
+        
+        // リサイズハンドル
+        this.setupResizeHandles();
+        
+        // クロップボックス移動
+        this.setupCropBoxMove();
+    }
+    
+    /**
+     * リサイズハンドルのイベントリスナー設定
+     */
+    setupResizeHandles() {
+        const handles = this.cropBox.querySelectorAll('.resize-handle');
+        handles.forEach(handle => {
+            handle.addEventListener('mousedown', (e) => this.startResize(e));
+            handle.addEventListener('touchstart', (e) => this.startResize(e));
+        });
+        
+        // グローバルイベント
+        document.addEventListener('mousemove', (e) => {
+            this.resize(e);
+            this.moveCropBox(e);
+        });
+        document.addEventListener('mouseup', () => {
+            this.endResize();
+            this.endMoveCropBox();
+        });
+        document.addEventListener('touchmove', (e) => {
+            this.resize(e);
+            this.moveCropBox(e);
+        });
+        document.addEventListener('touchend', () => {
+            this.endResize();
+            this.endMoveCropBox();
+        });
+    }
+    
+    /**
+     * クロップボックス移動のイベントリスナー設定
+     */
+    setupCropBoxMove() {
+        const overlay = this.cropBox.querySelector('.crop-overlay');
+        overlay.addEventListener('mousedown', (e) => this.startMoveCropBox(e));
+        overlay.addEventListener('touchstart', (e) => this.startMoveCropBox(e));
     }
     
     /**
@@ -152,6 +206,9 @@ class ImageCropper {
                 this.imageScaleSlider.value = 100;
                 this.scaleValue.textContent = '100%';
                 
+                // クロップボックスを中央に
+                this.resetCropBoxPosition();
+                
                 // 画像を描画
                 this.drawImage();
             };
@@ -211,9 +268,184 @@ class ImageCropper {
     }
     
     /**
+     * リサイズ開始
+     */
+    startResize(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        this.isResizing = true;
+        this.resizeDirection = e.target.dataset.direction;
+        
+        const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+        const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+        
+        this.resizeStart = {
+            x: clientX,
+            y: clientY,
+            width: this.cropSize.width,
+            height: this.cropSize.height
+        };
+    }
+    
+    /**
+     * リサイズ中
+     */
+    resize(e) {
+        if (!this.isResizing) return;
+        
+        e.preventDefault();
+        
+        const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+        const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+        
+        const deltaX = clientX - this.resizeStart.x;
+        const deltaY = clientY - this.resizeStart.y;
+        
+        let newWidth = this.resizeStart.width;
+        let newHeight = this.resizeStart.height;
+        
+        const direction = this.resizeDirection;
+        const ratio = this.getAspectRatioValue();
+        const isAspectLocked = this.currentAspectRatio !== 'free';
+        
+        // 方向に応じてサイズを計算
+        if (direction.includes('e')) {
+            newWidth = Math.max(50, this.resizeStart.width + deltaX);
+        }
+        if (direction.includes('w')) {
+            newWidth = Math.max(50, this.resizeStart.width - deltaX);
+        }
+        if (direction.includes('s')) {
+            newHeight = Math.max(50, this.resizeStart.height + deltaY);
+        }
+        if (direction.includes('n')) {
+            newHeight = Math.max(50, this.resizeStart.height - deltaY);
+        }
+        
+        // 縦横比が固定されている場合
+        if (isAspectLocked) {
+            if (direction.includes('e') || direction.includes('w')) {
+                // 横方向の変更時は高さを調整
+                newHeight = newWidth / ratio;
+            } else if (direction.includes('n') || direction.includes('s')) {
+                // 縦方向の変更時は幅を調整
+                newWidth = newHeight * ratio;
+            }
+        }
+        
+        // 最小サイズ制限
+        newWidth = Math.max(50, newWidth);
+        newHeight = Math.max(50, newHeight);
+        
+        // キャンバスサイズを超えないように制限
+        if (this.canvas) {
+            newWidth = Math.min(newWidth, this.canvas.width - 20);
+            newHeight = Math.min(newHeight, this.canvas.height - 20);
+            
+            // 縦横比維持の場合は再計算
+            if (isAspectLocked) {
+                if (newWidth / ratio > newHeight) {
+                    newWidth = newHeight * ratio;
+                } else {
+                    newHeight = newWidth / ratio;
+                }
+            }
+        }
+        
+        this.cropSize = { 
+            width: Math.round(newWidth), 
+            height: Math.round(newHeight) 
+        };
+        
+        // UIを更新
+        this.updateCropBoxSize();
+        
+        // 入力フォームも更新
+        this.cropWidthInput.value = Math.round(newWidth);
+        this.cropHeightInput.value = Math.round(newHeight);
+    }
+    
+    /**
+     * リサイズ終了
+     */
+    endResize() {
+        this.isResizing = false;
+        this.resizeDirection = null;
+    }
+    
+    /**
+     * クロップボックス移動開始
+     */
+    startMoveCropBox(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        this.isMovingCropBox = true;
+        
+        const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+        const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+        
+        this.cropBoxDragStart = {
+            x: clientX - this.cropPosition.x,
+            y: clientY - this.cropPosition.y
+        };
+        
+        this.cropBox.style.cursor = 'grabbing';
+    }
+    
+    /**
+     * クロップボックス移動中
+     */
+    moveCropBox(e) {
+        if (!this.isMovingCropBox) return;
+        
+        e.preventDefault();
+        
+        const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+        const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+        
+        this.cropPosition = {
+            x: clientX - this.cropBoxDragStart.x,
+            y: clientY - this.cropBoxDragStart.y
+        };
+        
+        this.updateCropBoxPosition();
+    }
+    
+    /**
+     * クロップボックス移動終了
+     */
+    endMoveCropBox() {
+        if (this.isMovingCropBox) {
+            this.isMovingCropBox = false;
+            this.cropBox.style.cursor = 'move';
+        }
+    }
+    
+    /**
+     * クロップボックスの位置を更新
+     */
+    updateCropBoxPosition() {
+        // キャンバスの範囲内に制限
+        if (this.canvas) {
+            const maxX = (this.canvas.width / 2) - 10;
+            const maxY = (this.canvas.height / 2) - 10;
+            
+            this.cropPosition.x = Math.max(-maxX, Math.min(maxX, this.cropPosition.x));
+            this.cropPosition.y = Math.max(-maxY, Math.min(maxY, this.cropPosition.y));
+        }
+        
+        this.cropBox.style.transform = `translate(calc(-50% + ${this.cropPosition.x}px), calc(-50% + ${this.cropPosition.y}px))`;
+    }
+    
+    /**
      * ドラッグ開始
      */
     startDrag(e) {
+        // リサイズ中は画像ドラッグを無効化
+        if (this.isResizing) return;
+        
         e.preventDefault();
         this.isDragging = true;
         
@@ -280,7 +512,7 @@ class ImageCropper {
      */
     handleAspectRatioChange(e) {
         this.currentAspectRatio = e.target.value;
-        this.updateCropBox();
+        this.updateCropBoxWithAspectRatio();
     }
     
     /**
@@ -314,6 +546,45 @@ class ImageCropper {
     }
     
     /**
+     * 縦横比変更時にクロップボックスを更新
+     */
+    updateCropBoxWithAspectRatio() {
+        const ratio = this.getAspectRatioValue();
+        let width = this.cropSize.width || 300;
+        let height = this.cropSize.height || 300;
+        
+        // 縦横比が固定されている場合、現在の幅を基準に高さを調整
+        if (this.currentAspectRatio !== 'free') {
+            height = width / ratio;
+        }
+        
+        // キャンバスサイズを超えないように制限
+        if (this.canvas) {
+            if (height > this.canvas.height - 20) {
+                height = this.canvas.height - 20;
+                width = height * ratio;
+            }
+            if (width > this.canvas.width - 20) {
+                width = this.canvas.width - 20;
+                if (this.currentAspectRatio !== 'free') {
+                    height = width / ratio;
+                }
+            }
+        }
+        
+        this.cropSize = { 
+            width: Math.round(width), 
+            height: Math.round(height) 
+        };
+        
+        // 入力フォームも更新
+        this.cropWidthInput.value = Math.round(width);
+        this.cropHeightInput.value = Math.round(height);
+        
+        this.updateCropBoxSize();
+    }
+    
+    /**
      * クロップボックスを更新
      */
     updateCropBox() {
@@ -334,12 +605,27 @@ class ImageCropper {
         }
         
         this.cropSize = { width, height };
-        this.cropBox.style.width = `${width}px`;
-        this.cropBox.style.height = `${height}px`;
+        this.updateCropBoxSize();
+    }
+    
+    /**
+     * クロップボックスのサイズのみ更新
+     */
+    updateCropBoxSize() {
+        this.cropBox.style.width = `${this.cropSize.width}px`;
+        this.cropBox.style.height = `${this.cropSize.height}px`;
         
         const overlay = this.cropBox.querySelector('.crop-overlay');
-        overlay.style.width = `${width}px`;
-        overlay.style.height = `${height}px`;
+        overlay.style.width = `${this.cropSize.width}px`;
+        overlay.style.height = `${this.cropSize.height}px`;
+    }
+    
+    /**
+     * クロップボックスをリセット（位置を中央に戻す）
+     */
+    resetCropBoxPosition() {
+        this.cropPosition = { x: 0, y: 0 };
+        this.cropBox.style.transform = 'translate(-50%, -50%)';
     }
     
     /**
@@ -348,9 +634,9 @@ class ImageCropper {
     cropImage() {
         if (!this.originalImage) return;
         
-        // クロップボックスの中心座標
-        const cropCenterX = this.canvas.width / 2;
-        const cropCenterY = this.canvas.height / 2;
+        // クロップボックスの中心座標（移動を考慮）
+        const cropCenterX = this.canvas.width / 2 + this.cropPosition.x;
+        const cropCenterY = this.canvas.height / 2 + this.cropPosition.y;
         
         // 画像の実際の座標
         const img = this.croppedImage || this.originalImage;
@@ -392,6 +678,10 @@ class ImageCropper {
             };
             this.imageScaleSlider.value = 100;
             this.scaleValue.textContent = '100%';
+            
+            // クロップボックスの位置もリセット
+            this.resetCropBoxPosition();
+            
             this.drawImage();
             this.downloadBtn.disabled = false;
         };
@@ -413,6 +703,10 @@ class ImageCropper {
         this.imageScaleSlider.value = 100;
         this.scaleValue.textContent = '100%';
         this.downloadBtn.disabled = true;
+        
+        // クロップボックスの位置もリセット
+        this.resetCropBoxPosition();
+        
         this.drawImage();
     }
     
