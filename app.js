@@ -415,7 +415,7 @@ class ImageCropper {
      */
     handleAspectRatioChange(e) {
         this.currentAspectRatio = e.target.value;
-        this.updateCropBox();
+        this.updateCropBoxWithAspectRatio();
     }
     
     /**
@@ -446,6 +446,45 @@ class ImageCropper {
             '9:16': 9/16
         };
         return ratios[this.currentAspectRatio] || 1;
+    }
+    
+    /**
+     * 縦横比変更時にクロップボックスを更新
+     */
+    updateCropBoxWithAspectRatio() {
+        const ratio = this.getAspectRatioValue();
+        let width = this.cropSize.width || 300;
+        let height = this.cropSize.height || 300;
+        
+        // 縦横比が固定されている場合、現在の幅を基準に高さを調整
+        if (this.currentAspectRatio !== 'free') {
+            height = width / ratio;
+        }
+        
+        // キャンバスサイズを超えないように制限
+        if (this.canvas) {
+            if (height > this.canvas.height - 20) {
+                height = this.canvas.height - 20;
+                width = height * ratio;
+            }
+            if (width > this.canvas.width - 20) {
+                width = this.canvas.width - 20;
+                if (this.currentAspectRatio !== 'free') {
+                    height = width / ratio;
+                }
+            }
+        }
+        
+        this.cropSize = { 
+            width: Math.round(width), 
+            height: Math.round(height) 
+        };
+        
+        // 入力フォームも更新
+        this.cropWidthInput.value = Math.round(width);
+        this.cropHeightInput.value = Math.round(height);
+        
+        this.updateCropBoxSize();
     }
     
     /**
