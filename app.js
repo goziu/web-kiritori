@@ -33,6 +33,11 @@ class ImageCropper {
         this.currentAspectRatio = 'free';
         this.cropSize = { width: 300, height: 300 };
         
+        // リサイズ状態管理
+        this.isResizing = false;
+        this.resizeDirection = null;
+        this.resizeStart = { x: 0, y: 0, width: 0, height: 0 };
+        
         this.init();
     }
     
@@ -85,6 +90,26 @@ class ImageCropper {
         this.resetBtn.addEventListener('click', () => this.resetImage());
         this.cropBtn.addEventListener('click', () => this.cropImage());
         this.downloadBtn.addEventListener('click', () => this.downloadImage());
+        
+        // リサイズハンドル
+        this.setupResizeHandles();
+    }
+    
+    /**
+     * リサイズハンドルのイベントリスナー設定
+     */
+    setupResizeHandles() {
+        const handles = this.cropBox.querySelectorAll('.resize-handle');
+        handles.forEach(handle => {
+            handle.addEventListener('mousedown', (e) => this.startResize(e));
+            handle.addEventListener('touchstart', (e) => this.startResize(e));
+        });
+        
+        // グローバルイベント
+        document.addEventListener('mousemove', (e) => this.resize(e));
+        document.addEventListener('mouseup', () => this.endResize());
+        document.addEventListener('touchmove', (e) => this.resize(e));
+        document.addEventListener('touchend', () => this.endResize());
     }
     
     /**
@@ -211,9 +236,119 @@ class ImageCropper {
     }
     
     /**
+     * リサイズ開始
+     */
+    startResize(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        this.isResizing = true;
+        this.resizeDirection = e.target.dataset.direction;
+        
+        const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+        const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+        
+        this.resizeStart = {
+            x: clientX,
+            y: clientY,
+            width: this.cropSize.width,
+            height: this.cropSize.height
+        };
+    }
+    
+    /**
+     * リサイズ中
+     */
+    resize(e) {
+        if (!this.isResizing) return;
+        
+        e.preventDefault();
+        
+        const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+        const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+        
+        const deltaX = clientX - this.resizeStart.x;
+        const deltaY = clientY - this.resizeStart.y;
+        
+        let newWidth = this.resizeStart.width;
+        let newHeight = this.resizeStart.height;
+        
+        const direction = this.resizeDirection;
+        const ratio = this.getAspectRatioValue();
+        const isAspectLocked = this.currentAspectRatio !== 'free';
+        
+        // 方向に応じてサイズを計算
+        if (direction.includes('e')) {
+            newWidth = Math.max(50, this.resizeStart.width + deltaX);
+        }
+        if (direction.includes('w')) {
+            newWidth = Math.max(50, this.resizeStart.width - deltaX);
+        }
+        if (direction.includes('s')) {
+            newHeight = Math.max(50, this.resizeStart.height + deltaY);
+        }
+        if (direction.includes('n')) {
+            newHeight = Math.max(50, this.resizeStart.height - deltaY);
+        }
+        
+        // 縦横比が固定されている場合
+        if (isAspectLocked) {
+            if (direction.includes('e') || direction.includes('w')) {
+                // 横方向の変更時は高さを調整
+                newHeight = newWidth / ratio;
+            } else if (direction.includes('n') || direction.includes('s')) {
+                // 縦方向の変更時は幅を調整
+                newWidth = newHeight * ratio;
+            }
+        }
+        
+        // 最小サイズ制限
+        newWidth = Math.max(50, newWidth);
+        newHeight = Math.max(50, newHeight);
+        
+        // キャンバスサイズを超えないように制限
+        if (this.canvas) {
+            newWidth = Math.min(newWidth, this.canvas.width - 20);
+            newHeight = Math.min(newHeight, this.canvas.height - 20);
+            
+            // 縦横比維持の場合は再計算
+            if (isAspectLocked) {
+                if (newWidth / ratio > newHeight) {
+                    newWidth = newHeight * ratio;
+                } else {
+                    newHeight = newWidth / ratio;
+                }
+            }
+        }
+        
+        this.cropSize = { 
+            width: Math.round(newWidth), 
+            height: Math.round(newHeight) 
+        };
+        
+        // UIを更新
+        this.updateCropBoxSize();
+        
+        // 入力フォームも更新
+        this.cropWidthInput.value = Math.round(newWidth);
+        this.cropHeightInput.value = Math.round(newHeight);
+    }
+    
+    /**
+     * リサイズ終了
+     */
+    endResize() {
+        this.isResizing = false;
+        this.resizeDirection = null;
+    }
+    
+    /**
      * ドラッグ開始
      */
     startDrag(e) {
+        // リサイズ中は画像ドラッグを無効化
+        if (this.isResizing) return;
+        
         e.preventDefault();
         this.isDragging = true;
         
@@ -334,12 +469,19 @@ class ImageCropper {
         }
         
         this.cropSize = { width, height };
-        this.cropBox.style.width = `${width}px`;
-        this.cropBox.style.height = `${height}px`;
+        this.updateCropBoxSize();
+    }
+    
+    /**
+     * クロップボックスのサイズのみ更新
+     */
+    updateCropBoxSize() {
+        this.cropBox.style.width = `${this.cropSize.width}px`;
+        this.cropBox.style.height = `${this.cropSize.height}px`;
         
         const overlay = this.cropBox.querySelector('.crop-overlay');
-        overlay.style.width = `${width}px`;
-        overlay.style.height = `${height}px`;
+        overlay.style.width = `${this.cropSize.width}px`;
+        overlay.style.height = `${this.cropSize.height}px`;
     }
     
     /**

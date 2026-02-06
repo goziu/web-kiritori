@@ -1,0 +1,3 @@
+Always generate git commit messages in Japanese.
+Use Conventional Commits format.
+Output only the commit title.
