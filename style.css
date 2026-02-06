@@ -329,7 +329,8 @@ main {
     position: relative;
     border: 3px solid var(--primary-color);
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
-    pointer-events: none;
+    pointer-events: auto;
+    cursor: move;
 }
 
 .crop-box::before,
