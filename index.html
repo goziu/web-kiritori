@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>切り取りくん - 画像トリミングツール</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🖼️ 切り取りくん</h1>
+            <p class="subtitle">簡単・便利な画像トリミングツール</p>
+        </header>
+
+        <main>
+            <!-- 設定パネル -->
+            <div class="control-panel">
+                <div class="control-section">
+                    <h3>📐 縦横比</h3>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="aspect-ratio" value="free" checked>
+                            <span>自由</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="aspect-ratio" value="1:1">
+                            <span>1:1</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="aspect-ratio" value="4:3">
+                            <span>4:3</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="aspect-ratio" value="16:9">
+                            <span>16:9</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="aspect-ratio" value="3:4">
+                            <span>3:4</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="aspect-ratio" value="9:16">
+                            <span>9:16</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3>📏 トリミングサイズ</h3>
+                    <div class="size-inputs">
+                        <div class="input-group">
+                            <label for="crop-width">幅 (px)</label>
+                            <input type="number" id="crop-width" placeholder="オリジナル" min="1">
+                        </div>
+                        <div class="input-group">
+                            <label for="crop-height">高さ (px)</label>
+                            <input type="number" id="crop-height" placeholder="オリジナル" min="1">
+                        </div>
+                    </div>
+                    <p class="hint">※空欄の場合はトリミングエリアのサイズで出力されます</p>
+                </div>
+
+                <div class="control-section">
+                    <h3>🔍 画像サイズ調整</h3>
+                    <div class="slider-container">
+                        <input type="range" id="image-scale" min="10" max="300" value="100" disabled>
+                        <span id="scale-value">100%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 画像エリア -->
+            <div class="image-area">
+                <div id="upload-zone" class="upload-zone">
+                    <div class="upload-content">
+                        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <p>画像をドラッグ&ドロップ</p>
+                        <p class="or-text">または</p>
+                        <label for="file-input" class="file-label">ファイルを選択</label>
+                        <input type="file" id="file-input" accept="image/*" hidden>
+                    </div>
+                </div>
+
+                <div id="editor-zone" class="editor-zone" style="display: none;">
+                    <div class="canvas-container">
+                        <canvas id="image-canvas"></canvas>
+                        <div id="crop-box" class="crop-box">
+                            <div class="crop-overlay"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- アクションボタン -->
+            <div class="action-buttons">
+                <button id="clear-btn" class="btn btn-secondary" disabled>
+                    <span>🗑️</span> クリア
+                </button>
+                <button id="reset-btn" class="btn btn-secondary" disabled>
+                    <span>↩️</span> やり直し
+                </button>
+                <button id="crop-btn" class="btn btn-primary" disabled>
+                    <span>✂️</span> トリミング
+                </button>
+                <button id="download-btn" class="btn btn-success" disabled>
+                    <span>⬇️</span> ダウンロード
+                </button>
+            </div>
+        </main>
+
+        <footer>
+            <p>© 2026 切り取りくん - ブラウザ上で動作する安全な画像処理ツール</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
